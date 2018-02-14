@@ -1,4 +1,5 @@
-﻿using NPOI.XSSF.UserModel;
+﻿using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -37,7 +38,7 @@ namespace ExcelGrinder
             OpenFileDialog openFileDialog1 = new OpenFileDialog();
 
             openFileDialog1.InitialDirectory = "c:\\";
-            openFileDialog1.Filter = "txt files (*.txt)|*.txt|All files (*.*)|*.*";
+            openFileDialog1.Filter = "Excel document (*.xls)|*.xlsx";
             openFileDialog1.FilterIndex = 2;
             openFileDialog1.RestoreDirectory = true;
 
@@ -146,7 +147,7 @@ namespace ExcelGrinder
                 {
                     files = Directory.GetFiles(fbd.SelectedPath);
 
-                    InfoLabel.Text = "В папке: " + fbd.SelectedPath + " найдено " + files.Length.ToString() + " файлов.";
+                    ShowInfo("В папке: " + fbd.SelectedPath + " найдено " + files.Length.ToString() + " файлов.");
                     selectedPath = fbd.SelectedPath;
                 }
             }
@@ -186,39 +187,57 @@ namespace ExcelGrinder
                     {
                         continue;
                     }
-                    
-                    InfoLabel.Text = "Ищу: " + row[2].ToString() + " в файле: " + fileName;
-                    bool nameFound = SearchNameInFile(fileName);
+
+                    ShowInfo("Ищу: " + row[2].ToString() + " в файле: " + fileName);
+                    bool nameFound = SearchNameInFile(fileName, row[2].ToString());
                     if (nameFound)
                     {
-                        findRange(fileName);
-                        copyRange();
-                        showInfoInGrid();
+                        FindRange(fileName);
+                        CopyRange();
+                        ShowInfoInGrid();
                     }                    
                 }                
             }
         }
 
-        private void showInfoInGrid()
+        private bool SearchNameInFile(string fileName, string name)
+        {
+            using (var fs = File.OpenRead(fileName))
+            {
+                XSSFWorkbook workBook = new XSSFWorkbook(fs);
+                ISheet sheet = workBook.GetSheet(workBook.GetSheetName(0));
+                for (int i = 0; i < sheet.LastRowNum; i++)
+                {
+                    if (sheet.GetRow(i).GetCell(1).StringCellValue.Trim().ToUpper() == name.Trim().ToUpper())
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private void FindRange(string fileName)
         {
             throw new NotImplementedException();
         }
 
-        private void copyRange()
+        private void CopyRange()
         {
             throw new NotImplementedException();
         }
 
-        private void findRange(string fileName)
+        private void ShowInfoInGrid()
         {
-            throw new NotImplementedException();
-        }
 
-        private bool SearchNameInFile(string fileName)
+        }
+        #endregion
+
+        #region Helpers
+        private void ShowInfo(string message)
         {
-            throw new NotImplementedException();
+            InfoLabel.Text = message;
         }
-
 
         #endregion
     }
