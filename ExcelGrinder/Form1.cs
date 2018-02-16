@@ -1,4 +1,5 @@
-﻿using NPOI.SS.UserModel;
+﻿using NPOI.HSSF.UserModel;
+using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
@@ -15,13 +16,18 @@ namespace ExcelGrinder
 {
     public partial class Form1 : Form
     {
+        private string selectedPath;
+        private string[] files;
+        private DataTable DT = new DataTable();
+        private string surnameFile = string.Empty;
+        private List<string> NotFoundSurnames = new List<string>();
+        private Dictionary<string, int> Range = new Dictionary<string, int>();
+        private int destinationRowNum = 0;
 
-        string selectedPath;
-        string[] files;
-        DataTable DT = new DataTable();
-        string surnameFile = string.Empty;
+        private string newFileName = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\ExcelOutFile_" + DateTime.Now.ToString("yyyy_MM_dd") + ".xlsx";
+        IWorkbook destinationWb = new XSSFWorkbook();
 
-        string newFileName = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\ExcelOutFile_" + DateTime.Now.ToString("yyyy_MM_dd") + ".xlsx";
+        private bool CancelAction = false;
 
         public Form1()
         {
@@ -51,7 +57,7 @@ namespace ExcelGrinder
                         using (myStream)
                         {
                             XSSFWorkbook wb = new XSSFWorkbook(myStream);
-                            InfoLabel.Text = "Файл: " + openFileDialog1.FileName;
+                            ShowInfo("Файл: " + openFileDialog1.FileName);
                             surnameFile = openFileDialog1.FileName;
                             GetDataFromRuleBook(wb);
                         }
@@ -66,8 +72,8 @@ namespace ExcelGrinder
 
         private void GetDataFromRuleBook(XSSFWorkbook wb)
         {
-            var sheet = wb.GetSheet(wb.GetSheetName(0));
-            var source = new BindingSource();
+            ISheet sheet = wb.GetSheet(wb.GetSheetName(0));
+            BindingSource source = new BindingSource();
 
             DT.Rows.Clear();
             DT.Columns.Clear();
@@ -96,12 +102,11 @@ namespace ExcelGrinder
                         // TODO: you can add more cell types capatibility, e. g. formula
                         switch (cell.CellType)
                         {
-                            case NPOI.SS.UserModel.CellType.Numeric:
+                            case CellType.Numeric:
                                 DT.Rows[i][j] = sheet.GetRow(i).GetCell(j).NumericCellValue;
-                                //dataGridView1[j, i].Value = sh.GetRow(i).GetCell(j).NumericCellValue;
 
                                 break;
-                            case NPOI.SS.UserModel.CellType.String:
+                            case CellType.String:
                                 DT.Rows[i][j] = sheet.GetRow(i).GetCell(j).StringCellValue;
 
                                 break;
@@ -109,27 +114,19 @@ namespace ExcelGrinder
                     }
                 }
             }
-            /*List<Object> rowList = new List<object>();
-            for (int i = 0; i < sheet.LastRowNum; i++)
-            {
-                var row = sheet.GetRow(i);
-                var cells = row.Cells.ToList();
-                rowList.Add(cells);
-            }
-
-            source.DataSource = rowList;
-            */
+           
             ExcelRuleBookView.DataSource = DT;
         }
         #endregion
         #region ExcelGrind
         /* 1. Chose folder
-         * 2. Go through list of names {
-         * 3.    Go through excel files in folder {
-         * 4.         Search name in files
-         * 5.         After name found, find first and last line
-         * 6.         Copy and past line range to a new file 
-         * 7.         Show info in grid
+         * 2. Create Destination WorkBook
+         * 3. Go through list of names {
+         * 4.    Go through excel files in folder {
+         * 5.         Search name in files
+         * 6.         After name found, find first and last line
+         * 7.         Copy and past line range to a new file 
+         * 8.         Show info in grid
          *       } 
          *       if name not found, write it in the file and inform user
          *    }    
@@ -171,60 +168,198 @@ namespace ExcelGrinder
                 MessageBox.Show("Файл с фамилиями не выбран или пуст");
                 return;
             }
-            
 
+            if (destinationWb.NumberOfSheets > 0)
+            {
+                destinationWb.RemoveSheetAt(0);
+            }
+
+            destinationWb.CreateSheet("OutPut");
+            destinationRowNum = 0;
 
             foreach (DataRow row in DT.Rows)
             {
-                if (row[2].ToString().Contains(value: "Цикловая") || row[2].ToString().Contains(value: "Студклуб"))
+                var name = row[2].ToString();
+                if (string.IsNullOrEmpty(name))
+                    continue;
+
+                if (name.Contains(value: "Цикловая") || name.Contains(value: "Студклуб"))
                 {
                     continue;
                 }
-
+                bool isFound = false;
                 foreach (var fileName in files)
                 {
+                    if (CancelAction)
+                    {
+                        CancelAction = false;
+                        break;
+                    }
+
                     if (!Path.GetExtension(fileName).Contains("xls") || fileName == surnameFile)
                     {
                         continue;
                     }
 
-                    ShowInfo("Ищу: " + row[2].ToString() + " в файле: " + fileName);
-                    bool nameFound = SearchNameInFile(fileName, row[2].ToString());
-                    if (nameFound)
+                    //TESTING STUB!!!
+                    if (name.Trim() == "Бібікова Оксана Юріївна")
                     {
-                        FindRange(fileName);
-                        CopyRange();
-                        ShowInfoInGrid();
-                    }                    
-                }                
+                        return;
+                    }
+
+                    ShowInfo("Ищу: " + name + " в файле: " + fileName);
+                    using (var fs = File.OpenRead(fileName))
+                    {
+                        XSSFWorkbook workBook = new XSSFWorkbook(fs);
+                        ISheet sheet = workBook.GetSheet(workBook.GetSheetName(0));
+                        int rowNumber = SearchNameInFile(sheet, name);
+                        if (rowNumber >= 0)
+                        {
+                            isFound = true;
+                            FindRange(sheet, rowNumber);
+                            CopyRange(sheet);
+                            ShowInfoInGrid();
+                            continue;
+                        }
+                    }
+                }
+                if (!isFound)
+                {
+                    AddNotFound(name);
+                }
+            }
+
+            // Create file and write WorkBook
+            WriteOutputFile();
+
+            if (NotFoundSurnames.Count > 0)
+            {
+                WriteNotFoundFile(NotFoundSurnames);
             }
         }
 
-        private bool SearchNameInFile(string fileName, string name)
-        {
-            using (var fs = File.OpenRead(fileName))
-            {
-                XSSFWorkbook workBook = new XSSFWorkbook(fs);
-                ISheet sheet = workBook.GetSheet(workBook.GetSheetName(0));
-                for (int i = 0; i < sheet.LastRowNum; i++)
+       
+
+        private int SearchNameInFile(ISheet sheet, string name)
+        {               
+            for (int i = 0; i < sheet.LastRowNum; i++)
+            {   
+                try
                 {
-                    if (sheet.GetRow(i).GetCell(1).StringCellValue.Trim().ToUpper() == name.Trim().ToUpper())
+                    if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
                     {
-                        return true;
+                        if (sheet.GetRow(i).GetCell(1).StringCellValue.Trim().ToUpper() == name.Trim().ToUpper())
+                        {
+                            return i;
+                        }
+                    }
+                }
+                catch { }
+            }            
+            return -1;
+        }
+
+        private void FindRange(ISheet sheet, int rowNumber)
+        {
+            Range.Clear();
+            //Find start
+            for (int i = rowNumber; i > sheet.FirstRowNum; i--)
+            {
+                //if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
+                //{
+                    var currentCell = sheet.GetRow(i).GetCell(0).StringCellValue.Trim();
+                    if (sheet.GetRow(i).GetCell(0).StringCellValue.Trim().Contains("Розрахунковий"))
+                    {
+                        Range.Add("first", i);
+                        break;
+                    }
+                //}
+            }
+
+            //Find finish
+            for (int i = rowNumber; i < sheet.LastRowNum; i++)
+            {
+                if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
+                {
+                    if (sheet.GetRow(i).GetCell(1).StringCellValue.Trim().Contains("До видачі"))
+                    {
+                        Range.Add("last", i);
+                        break;
                     }
                 }
             }
-            return false;
         }
 
-        private void FindRange(string fileName)
+        private void CopyRange(ISheet sheet)
         {
-            throw new NotImplementedException();
-        }
+            if (!Range.ContainsKey("first") || !Range.ContainsKey("last"))
+            {
+                MessageBox.Show("Не смог найти начало или конец диапазона копирования");
+                return;
+            }
 
-        private void CopyRange()
-        {
-            throw new NotImplementedException();
+            for (int sourceRowNum = Range["first"]; sourceRowNum <= Range["last"]; sourceRowNum++)
+            {
+                //read row
+                IRow sourceRow = sheet.GetRow(sourceRowNum);
+                IRow newRow = destinationWb.GetSheet(destinationWb.GetSheetName(0)).CreateRow(destinationRowNum);
+                // Loop through source columns to add to new row
+                for (int i = 0; i < sourceRow.LastCellNum; i++)
+                {
+                    // Grab a copy of the old/new cell
+                    ICell oldCell = sourceRow.GetCell(i);
+                    ICell newCell = newRow.CreateCell(i);
+
+                    // If the old cell is null jump to next cell
+                    if (oldCell == null)
+                    {
+                        newCell = null;
+                        continue;
+                    }
+                    // Copy style from old cell and apply to new cell
+                    ICellStyle newCellStyle = destinationWb.CreateCellStyle();
+                    newCellStyle.CloneStyleFrom(oldCell.CellStyle); 
+                    newCell.CellStyle = newCellStyle;
+
+                    // If there is a cell comment, copy
+                    if (newCell.CellComment != null) newCell.CellComment = oldCell.CellComment;
+
+                    // If there is a cell hyperlink, copy
+                    if (oldCell.Hyperlink != null) newCell.Hyperlink = oldCell.Hyperlink;
+
+                    // Set the cell data type
+                    newCell.SetCellType(oldCell.CellType);
+
+                    // Set the cell data value
+                    switch (oldCell.CellType)
+                    {
+                        case CellType.Blank:
+                            newCell.SetCellValue(oldCell.StringCellValue);
+                            break;
+                        case CellType.Boolean:
+                            newCell.SetCellValue(oldCell.BooleanCellValue);
+                            break;
+                        case CellType.Error:
+                            newCell.SetCellErrorValue(oldCell.ErrorCellValue);
+                            break;
+                        case CellType.Formula:
+                            newCell.SetCellFormula(oldCell.CellFormula);
+                            break;
+                        case CellType.Numeric:
+                            newCell.SetCellValue(oldCell.NumericCellValue);
+                            break;
+                        case CellType.String:
+                            newCell.SetCellValue(oldCell.RichStringCellValue);
+                            break;
+                        case CellType.Unknown:
+                            newCell.SetCellValue(oldCell.StringCellValue);
+                            break;
+                    }
+
+                }
+                destinationRowNum++;
+            }
+                
         }
 
         private void ShowInfoInGrid()
@@ -238,6 +373,30 @@ namespace ExcelGrinder
         {
             InfoLabel.Text = message;
         }
+
+        private void AddNotFound(string name)
+        {
+            NotFoundSurnames.Add(name);
+        }
+
+        private void WriteOutputFile()
+        {
+            using (FileStream stream = new FileStream(newFileName, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                destinationWb.Write(stream);
+            }
+        }
+
+        private void WriteNotFoundFile(List<string> notFoundSurnames)
+        {
+            
+        }
+
+        private void Cancelbtn_Click(object sender, EventArgs e)
+        {
+            CancelAction = true;
+        }
+
 
         #endregion
     }

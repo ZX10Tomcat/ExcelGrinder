@@ -141,11 +141,13 @@
             this.Cancelbtn.TabIndex = 4;
             this.Cancelbtn.Text = "ОТМЕНА";
             this.Cancelbtn.UseVisualStyleBackColor = false;
+            this.Cancelbtn.Click += new System.EventHandler(this.Cancelbtn_Click);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoSize = true;
             this.ClientSize = new System.Drawing.Size(1322, 760);
             this.Controls.Add(this.Cancelbtn);
             this.Controls.Add(this.groupBox2);
@@ -153,6 +155,7 @@
             this.Controls.Add(this.groupBox1);
             this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Name = "Form1";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Excel grinder";
             this.groupBox1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.ExcelRuleBookView)).EndInit();
