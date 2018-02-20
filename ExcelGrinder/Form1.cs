@@ -12,6 +12,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Office.Interop.Excel;
+using System.Runtime.InteropServices;
+using NPOI.SS.Util;
 
 namespace ExcelGrinder
 {
@@ -27,7 +29,7 @@ namespace ExcelGrinder
         private int destinationRowNum = 0;
 
         private string newFileName = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\ExcelOutFile_" + DateTime.Now.ToString("yyyy_MM_dd") + ".xlsx";
-        IWorkbook destinationWb = new XSSFWorkbook();
+        XSSFWorkbook destinationWb = new XSSFWorkbook();
 
         private bool CancelAction = false;
 
@@ -116,7 +118,7 @@ namespace ExcelGrinder
                     }
                 }
             }
-           
+
             ExcelRuleBookView.DataSource = surnameDT;
         }
         #endregion
@@ -177,7 +179,7 @@ namespace ExcelGrinder
             }
 
             destinationWb.CreateSheet("OutPut");
-            
+
             destinationRowNum = 0;
 
             foreach (DataRow row in surnameDT.Rows)
@@ -210,7 +212,7 @@ namespace ExcelGrinder
                     {
                         continue;
                     }
-                                      
+
 
                     ShowInfo("Ищу: " + name + " в файле: " + fileName);
                     using (var fs = File.OpenRead(fileName))
@@ -223,7 +225,7 @@ namespace ExcelGrinder
                             isFound = true;
                             FindRange(sheet, rowNumber);
                             SetColumnsWidth(sheet);
-                            CopyRange(sheet);
+                            CopyRange(sheet, workBook);
                             continue;
                         }
                     }
@@ -244,11 +246,11 @@ namespace ExcelGrinder
                 WriteNotFoundFile(NotFoundSurnames);
             }
         }
-        
+
         private int SearchNameInFile(ISheet sheet, string name)
-        {               
+        {
             for (int i = 0; i < sheet.LastRowNum; i++)
-            {   
+            {
                 try
                 {
                     if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
@@ -260,7 +262,7 @@ namespace ExcelGrinder
                     }
                 }
                 catch { }
-            }            
+            }
             return -1;
         }
 
@@ -272,12 +274,12 @@ namespace ExcelGrinder
             {
                 //if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
                 //{
-                    var currentCell = sheet.GetRow(i).GetCell(0).StringCellValue.Trim();
-                    if (sheet.GetRow(i).GetCell(0).StringCellValue.Trim().Contains("Розрахунковий"))
-                    {
-                        Range.Add("first", i);
-                        break;
-                    }
+                var currentCell = sheet.GetRow(i).GetCell(0).StringCellValue.Trim();
+                if (sheet.GetRow(i).GetCell(0).StringCellValue.Trim().Contains("Розрахунковий"))
+                {
+                    Range.Add("first", i);
+                    break;
+                }
                 //}
             }
 
@@ -295,7 +297,7 @@ namespace ExcelGrinder
             }
         }
 
-        private void CopyRange(ISheet sheet)
+        private void CopyRange(ISheet sheet, IWorkbook wb)
         {
             if (!Range.ContainsKey("first") || !Range.ContainsKey("last"))
             {
@@ -312,8 +314,8 @@ namespace ExcelGrinder
                 for (int i = 0; i < sourceRow.LastCellNum; i++)
                 {
                     // Grab a copy of the old/new cell
-                    ICell oldCell = sourceRow.GetCell(i);
-                    ICell newCell = newRow.CreateCell(i);
+                    XSSFCell oldCell = (XSSFCell)sourceRow.GetCell(i);
+                    XSSFCell newCell = (XSSFCell)newRow.CreateCell(i);
 
                     // If the old cell is null jump to next cell
                     if (oldCell == null)
@@ -322,10 +324,44 @@ namespace ExcelGrinder
                         continue;
                     }
                     // Copy style from old cell and apply to new cell
-                    ICellStyle newCellStyle = destinationWb.CreateCellStyle();
-                    newCellStyle.CloneStyleFrom(oldCell.CellStyle); 
-                    newCell.CellStyle = newCellStyle;
+                    XSSFCellStyle newCellStyle = (XSSFCellStyle)destinationWb.CreateCellStyle();
+                    //newCellStyle.CloneStyleFrom(oldCell.CellStyle);
                     
+
+                    //Borders
+                    byte[] rgb = new byte[3] { 0, 0, 0 };
+                    newCellStyle.BorderBottom = oldCell.CellStyle.BorderBottom;
+                    newCellStyle.SetBottomBorderColor(new XSSFColor(rgb));
+                    newCellStyle.BorderLeft = oldCell.CellStyle.BorderLeft;
+                    newCellStyle.SetLeftBorderColor(new XSSFColor(rgb));
+                    newCellStyle.BorderTop = oldCell.CellStyle.BorderTop;
+                    newCellStyle.SetTopBorderColor(new XSSFColor(rgb));
+                    newCellStyle.BorderRight = oldCell.CellStyle.BorderRight;
+                    newCellStyle.SetRightBorderColor(new XSSFColor(rgb));
+
+
+                    //Text Style
+                    newCellStyle.WrapText = oldCell.CellStyle.WrapText;
+                    newCellStyle.ShrinkToFit = oldCell.CellStyle.ShrinkToFit;
+                    newCellStyle.Alignment = oldCell.CellStyle.Alignment;
+                    newCellStyle.VerticalAlignment = oldCell.CellStyle.VerticalAlignment;
+
+                    //Font
+                    NPOI.SS.UserModel.IFont font = destinationWb.CreateFont();
+                    NPOI.SS.UserModel.IFont sourceFont = oldCell.CellStyle.GetFont(wb);
+                    font.FontName = sourceFont.FontName;
+                    font.FontHeightInPoints = sourceFont.FontHeightInPoints;
+                    font.Boldweight = sourceFont.Boldweight;
+                    newCellStyle.SetFont(font);
+
+                    //newCellStyle.CloneStyleFrom(oldCell.CellStyle);
+
+                    newCell.CellStyle = newCellStyle;
+                     
+
+                    //NPOI.SS.UserModel.IFont cellFont = oldCell.CellStyle.GetFont();
+                    //newCell.CellStyle.SetFont(cellFont);
+
 
                     // If there is a cell comment, copy
                     if (newCell.CellComment != null) newCell.CellComment = oldCell.CellComment;
@@ -363,6 +399,22 @@ namespace ExcelGrinder
                     }
 
                 }
+
+                // If there are are any merged regions in the source row, copy to new row
+                for (int i = 0; i < sheet.NumMergedRegions; i++)
+                {
+                    CellRangeAddress cellRangeAddress = sheet.GetMergedRegion(i);
+                    if (cellRangeAddress.FirstRow == sourceRow.RowNum)
+                    {
+                        CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
+                                                                                    (newRow.RowNum +
+                                                                                     (cellRangeAddress.FirstRow -
+                                                                                      cellRangeAddress.LastRow)),
+                                                                                    cellRangeAddress.FirstColumn,
+                                                                                    cellRangeAddress.LastColumn);
+                        destinationWb.GetSheet(destinationWb.GetSheetName(0)).AddMergedRegion(newCellRangeAddress);
+                    }
+                }
                 destinationRowNum++;
             }
 
@@ -377,6 +429,9 @@ namespace ExcelGrinder
             {
                 destSheet.SetColumnWidth(i, sourceSheet.GetColumnWidth(i));
             }
+            //Dirty hack
+            destSheet.SetColumnWidth(4, 1);
+            destSheet.SetColumnWidth(8, 1);
         }
 
         private void ShowInfoInGrid()
@@ -402,7 +457,7 @@ namespace ExcelGrinder
 
                     // add row
                     infoDT.Rows.Add();
-                
+
                     // write row value
                     for (int j = 0; j < sheet.GetRow(i).Cells.Count; j++)
                     {
@@ -464,12 +519,23 @@ namespace ExcelGrinder
         }
         #endregion
 
-        private void button1_Click(object sender, EventArgs e)
+        private void TestExcelbtn_Click(object sender, EventArgs e)
         {
             Microsoft.Office.Interop.Excel.Application excel = new Microsoft.Office.Interop.Excel.Application();
 
-            string path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\Excel examples\\1.xlsx";
-            Workbook wb = excel.Workbooks.Open(path);
+            if (excel == null)
+            {
+                MessageBox.Show("Excel не установлен или версии не совпадают!");
+                return;
+            }
+
+            if (files == null || files.Length == 0)
+            {
+                MessageBox.Show("Выберите папку с файлами Excel");
+                return;
+            }
+
+            Workbook wb = excel.Workbooks.Open(files[0]);
             Worksheet sheet = wb.Worksheets.get_Item(1);
             Range sourceRange = sheet.Rows["1:100"];
             sourceRange.Copy();
@@ -480,6 +546,17 @@ namespace ExcelGrinder
             rangeDest.PasteSpecial(XlPasteType.xlPasteAll);
 
             wbDest.SaveAs(newFileName);
+            wb.Close(true);
+            wbDest.Close(true);
+            excel.Quit();
+
+            Marshal.ReleaseComObject(wb);
+            Marshal.ReleaseComObject(wb);
+            Marshal.ReleaseComObject(wbDest);
+            Marshal.ReleaseComObject(wbDest);
+            Marshal.ReleaseComObject(excel);
+
+            MessageBox.Show("Тест прошел успешно, тестовый файл сохранен в: " + newFileName);
         }
     }
 }
