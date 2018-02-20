@@ -14,3 +14,4 @@ C:\Users\bsamoletsky\Documents\Visual Studio 2017\Projects\ExcelGrinder\ExcelGri
 C:\Users\bsamoletsky\Documents\Visual Studio 2017\Projects\ExcelGrinder\ExcelGrinder\obj\Debug\ExcelGrinder.csproj.CoreCompileInputs.cache
 C:\Users\bsamoletsky\Documents\Visual Studio 2017\Projects\ExcelGrinder\ExcelGrinder\obj\Debug\ExcelGrinder.exe
 C:\Users\bsamoletsky\Documents\Visual Studio 2017\Projects\ExcelGrinder\ExcelGrinder\obj\Debug\ExcelGrinder.pdb
+C:\Users\bsamoletsky\Documents\Visual Studio 2017\Projects\ExcelGrinder\ExcelGrinder\obj\Debug\ExcelGrinder.csproj.ResolveComReference.cache
