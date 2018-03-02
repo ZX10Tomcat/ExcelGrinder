@@ -79,12 +79,12 @@
             // 
             // InfoLabel
             // 
-            this.InfoLabel.AutoSize = true;
             this.InfoLabel.Location = new System.Drawing.Point(20, 722);
             this.InfoLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.InfoLabel.Name = "InfoLabel";
-            this.InfoLabel.Size = new System.Drawing.Size(0, 20);
+            this.InfoLabel.Size = new System.Drawing.Size(960, 56);
             this.InfoLabel.TabIndex = 2;
+            this.InfoLabel.Text = "Информация";
             // 
             // groupBox2
             // 
@@ -119,7 +119,7 @@
             this.Grindbtn.TabIndex = 1;
             this.Grindbtn.Text = "НАЧАТЬ!";
             this.Grindbtn.UseVisualStyleBackColor = false;
-            this.Grindbtn.Click += new System.EventHandler(this.Grindbtn_Click);
+            this.Grindbtn.Click += new System.EventHandler(this.Grindbtn_ClickAsync);
             // 
             // ChoseFolderbtn
             // 
@@ -135,7 +135,7 @@
             // Cancelbtn
             // 
             this.Cancelbtn.BackColor = System.Drawing.Color.Red;
-            this.Cancelbtn.Location = new System.Drawing.Point(1150, 715);
+            this.Cancelbtn.Location = new System.Drawing.Point(1150, 736);
             this.Cancelbtn.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Cancelbtn.Name = "Cancelbtn";
             this.Cancelbtn.Size = new System.Drawing.Size(153, 40);
@@ -146,9 +146,9 @@
             // 
             // testExcelbtn
             // 
-            this.testExcelbtn.Location = new System.Drawing.Point(1150, 712);
+            this.testExcelbtn.Location = new System.Drawing.Point(996, 736);
             this.testExcelbtn.Name = "testExcelbtn";
-            this.testExcelbtn.Size = new System.Drawing.Size(153, 43);
+            this.testExcelbtn.Size = new System.Drawing.Size(147, 40);
             this.testExcelbtn.TabIndex = 3;
             this.testExcelbtn.Text = "Тест Excel";
             this.testExcelbtn.UseVisualStyleBackColor = true;
@@ -159,7 +159,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoSize = true;
-            this.ClientSize = new System.Drawing.Size(1322, 760);
+            this.ClientSize = new System.Drawing.Size(1322, 787);
             this.Controls.Add(this.testExcelbtn);
             this.Controls.Add(this.Cancelbtn);
             this.Controls.Add(this.groupBox2);
@@ -174,7 +174,6 @@
             this.groupBox2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.ExcelOutputView)).EndInit();
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
 
