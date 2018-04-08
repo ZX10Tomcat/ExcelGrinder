@@ -135,7 +135,7 @@
             // Cancelbtn
             // 
             this.Cancelbtn.BackColor = System.Drawing.Color.Red;
-            this.Cancelbtn.Location = new System.Drawing.Point(1150, 736);
+            this.Cancelbtn.Location = new System.Drawing.Point(1151, 712);
             this.Cancelbtn.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Cancelbtn.Name = "Cancelbtn";
             this.Cancelbtn.Size = new System.Drawing.Size(153, 40);
@@ -146,7 +146,7 @@
             // 
             // testExcelbtn
             // 
-            this.testExcelbtn.Location = new System.Drawing.Point(996, 736);
+            this.testExcelbtn.Location = new System.Drawing.Point(996, 714);
             this.testExcelbtn.Name = "testExcelbtn";
             this.testExcelbtn.Size = new System.Drawing.Size(147, 40);
             this.testExcelbtn.TabIndex = 3;
@@ -159,7 +159,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoSize = true;
-            this.ClientSize = new System.Drawing.Size(1322, 787);
+            this.ClientSize = new System.Drawing.Size(1322, 764);
             this.Controls.Add(this.testExcelbtn);
             this.Controls.Add(this.Cancelbtn);
             this.Controls.Add(this.groupBox2);

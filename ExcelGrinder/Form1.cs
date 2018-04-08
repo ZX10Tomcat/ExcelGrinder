@@ -141,10 +141,10 @@ namespace ExcelGrinder
                 bool isFound = false;
 
                 //TESTING STUB!!!
-                if (name.Trim() == "Бібікова Оксана Юріївна")
+                /*if (name.Trim() == "Бібікова Оксана Юріївна")
                 {
                     break;
-                }
+                } */
                 
                 foreach (var fileName in files)
                 {
