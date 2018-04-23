@@ -15,18 +15,22 @@ namespace ExcelGrinder
 {
     class ExcelGrinderModel
     {
+        public static event EventHandler<string> ShowInfo;
+
         private System.Data.DataTable surnameDT = new System.Data.DataTable();
         private System.Data.DataTable infoDT = new System.Data.DataTable();
         private string surnameFile = string.Empty;
         private List<string> NotFoundSurnames = new List<string>();
         private int destinationRowNum = 0;
 
+        private const string FIOMarker = "ПІБ";
+        
         private string newFileName = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\ExcelOutFile_" + DateTime.Now.ToString("yyyy_MM_dd") + ".xlsx";
         XSSFWorkbook destinationWb = new XSSFWorkbook();
 
-        Dictionary<string, int> Range = new Dictionary<string, int>();
-
         private bool CancelAction = false;
+
+        private List<SurnameObject> Surnames = new List<SurnameObject>();
 
         public DataTable GetDataFromRuleBook(XSSFWorkbook wb)
         {
@@ -76,16 +80,15 @@ namespace ExcelGrinder
         }
 
 
-        public async Task CopyPeople(XSSFWorkbook workBook, ISheet sheet, int rowNumber)
-        {
-            Range = FindRange(sheet, rowNumber);
+        public async Task CopyPeople(XSSFWorkbook workBook, ISheet sheet, SurnameObject Surname)
+        {   
             SetColumnsWidth(sheet);
-            CopyRange(sheet, workBook);
+            CopyRange(sheet, workBook, Surname);
         }
 
-        public Dictionary<string, int> FindRange(ISheet sheet, int rowNumber)
+        public SurnameObject FindRange(ISheet sheet, int rowNumber)
         {
-            Range.Clear();
+            SurnameObject Range = new SurnameObject();
             //Find start
             for (int i = rowNumber; i > sheet.FirstRowNum; i--)
             {
@@ -94,7 +97,7 @@ namespace ExcelGrinder
                 var currentCell = sheet.GetRow(i).GetCell(0).StringCellValue.Trim();
                 if (sheet.GetRow(i).GetCell(0).StringCellValue.Trim().Contains("Розрахунковий"))
                 {
-                    Range.Add("first", i);
+                    Range.Start =  i;
                     break;
                 }
                 //}
@@ -107,7 +110,7 @@ namespace ExcelGrinder
                 {
                     if (sheet.GetRow(i).GetCell(1).StringCellValue.Trim().Contains("До видачі"))
                     {
-                        Range.Add("last", i);
+                        Range.Finish = i;
                         break;
                     }
                 }
@@ -128,15 +131,15 @@ namespace ExcelGrinder
             destSheet.SetColumnWidth(8, 1);
         }
 
-        public void CopyRange(ISheet sheet, IWorkbook wb)
+        public void CopyRange(ISheet sheet, IWorkbook wb, SurnameObject Surname)
         {
-            if (!Range.ContainsKey("first") || !Range.ContainsKey("last"))
+            if (Surname.Start == 0 || Surname.Finish == 0)
             {
                 MessageBox.Show("Не смог найти начало или конец диапазона копирования");
                 return;
             }
 
-            for (int sourceRowNum = Range["first"]; sourceRowNum <= Range["last"]; sourceRowNum++)
+            for (int sourceRowNum = Surname.Start; sourceRowNum <= Surname.Finish; sourceRowNum++)
             {
                 //read row
                 IRow sourceRow = sheet.GetRow(sourceRowNum);
@@ -162,21 +165,15 @@ namespace ExcelGrinder
                     //Borders
                     CopyBordersStyle(oldCell, newCellStyle);
 
-
-                    //Text Style
+                    ////Text Style
                     CopyTextStyle(oldCell, newCellStyle);
 
-                    //Font
+                    ////Font
                     CopyFontStyle(wb, oldCell, newCellStyle);
 
-                    //newCellStyle.CloneStyleFrom(oldCell.CellStyle);
+                    ////newCellStyle.CloneStyleFrom(oldCell.CellStyle);
 
                     newCell.CellStyle = newCellStyle;
-
-
-                    //NPOI.SS.UserModel.IFont cellFont = oldCell.CellStyle.GetFont();
-                    //newCell.CellStyle.SetFont(cellFont);
-
 
                     // If there is a cell comment, copy
                     if (newCell.CellComment != null) newCell.CellComment = oldCell.CellComment;
@@ -188,30 +185,7 @@ namespace ExcelGrinder
                     newCell.SetCellType(oldCell.CellType);
 
                     // Set the cell data value
-                    switch (oldCell.CellType)
-                    {
-                        case CellType.Blank:
-                            newCell.SetCellValue(oldCell.StringCellValue);
-                            break;
-                        case CellType.Boolean:
-                            newCell.SetCellValue(oldCell.BooleanCellValue);
-                            break;
-                        case CellType.Error:
-                            newCell.SetCellErrorValue(oldCell.ErrorCellValue);
-                            break;
-                        case CellType.Formula:
-                            newCell.SetCellFormula(oldCell.CellFormula);
-                            break;
-                        case CellType.Numeric:
-                            newCell.SetCellValue(oldCell.NumericCellValue);
-                            break;
-                        case CellType.String:
-                            newCell.SetCellValue(oldCell.RichStringCellValue);
-                            break;
-                        case CellType.Unknown:
-                            newCell.SetCellValue(oldCell.StringCellValue);
-                            break;
-                    }
+                    SetCellValue(oldCell, newCell);
 
                 }
 
@@ -235,6 +209,103 @@ namespace ExcelGrinder
 
             destinationRowNum++;
 
+        }
+
+        private static void SetCellValue(XSSFCell oldCell, XSSFCell newCell)
+        {
+            switch (oldCell.CellType)
+            {
+                case CellType.Blank:
+                    newCell.SetCellValue(oldCell.StringCellValue);
+                    break;
+                case CellType.Boolean:
+                    newCell.SetCellValue(oldCell.BooleanCellValue);
+                    break;
+                case CellType.Error:
+                    newCell.SetCellErrorValue(oldCell.ErrorCellValue);
+                    break;
+                case CellType.Formula:
+                    newCell.SetCellFormula(oldCell.CellFormula);
+                    break;
+                case CellType.Numeric:
+                    newCell.SetCellValue(oldCell.NumericCellValue);
+                    break;
+                case CellType.String:
+                    newCell.SetCellValue(oldCell.RichStringCellValue);
+                    break;
+                case CellType.Unknown:
+                    newCell.SetCellValue(oldCell.StringCellValue);
+                    break;
+            }
+        }
+
+        /* 1. Create list of objects (FIO, start, finish)
+         * 2. copy all files into one XSSWorkbook
+         * 3. Go through Workbook and fill list of objects
+         * 4. Go through surnames and when match - copy to the new XSSFWorkbook 
+         * 5. if not match - add to notfound
+         * 6. Create a new file on the disk from XSSFWorkbook
+         */
+
+        /* 1) Create public Event ShowInfo
+         * 2) Subscribe on this event on form
+         * 3) Show info on form
+         */
+
+
+        internal List<SurnameObject> ScanBooks(string[] files)
+        {
+            destinationRowNum = 0;
+            Surnames.Clear();
+
+            foreach (var fileName in files)
+            {
+                if (CancelAction)
+                {
+                    CancelAction = false;
+                    break;
+                }
+
+                if (!Path.GetExtension(fileName).Contains("xls") || fileName == surnameFile)
+                {
+                    continue;
+                }
+
+                //ShowInfo("Ищу: " + name.Trim() + " в файле: " + fileName.Trim());
+                using (var fs = File.OpenRead(fileName))
+                {
+                    XSSFWorkbook workBook = new XSSFWorkbook(fs);
+                    ISheet sheet = workBook.GetSheet(workBook.GetSheetName(0));
+                    GetSurnamesFromFile(sheet, workBook, fileName);
+                }
+            }
+            return Surnames;
+            ShowInfo(this, "Поиск фамилий закончен");
+        }
+
+        private List<SurnameObject> GetSurnamesFromFile(ISheet sheet, XSSFWorkbook workBook, string fileName)
+        {
+            for (int i = 0; i < sheet.LastRowNum; i++)
+            {
+                try
+                {
+                    if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
+                    {
+                        if (sheet.GetRow(i).GetCell(0).StringCellValue.Trim().ToUpper() == FIOMarker)
+                        {
+                            SurnameObject Surname = FindRange(sheet, i);
+                            
+                            string surname = sheet.GetRow(i).GetCell(1).StringCellValue.Trim();
+                            Surname.Surname = surname.Trim();
+                            Surname.File = fileName;
+                            ShowInfo(this, "Найдено: " + surname.Trim() + " в файле: " + fileName.Trim());
+                            Surnames.Add(Surname);
+                        }
+                    }
+                }
+                catch { }
+            }
+            return Surnames;
         }
 
         private void CopyFontStyle(IWorkbook wb, XSSFCell oldCell, XSSFCellStyle newCellStyle)

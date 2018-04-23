@@ -29,12 +29,16 @@ namespace ExcelGrinder
         XSSFWorkbook destinationWb = new XSSFWorkbook();
 
         private bool CancelAction = false;
-
+        
         public Form1()
         {
             InitializeComponent();
             ExcelGrinderModel Model = new ExcelGrinderModel();
+
+            ExcelGrinderModel.ShowInfo += ShowInfo;
         }
+
+        
         #region SurnameList
         /* 1. Chose file with list
          * 2. read file and show it in the grid
@@ -59,7 +63,7 @@ namespace ExcelGrinder
                         using (myStream)
                         {
                             XSSFWorkbook wb = new XSSFWorkbook(myStream);
-                            ShowInfo("Файл: " + openFileDialog1.FileName);
+                            ShowInfo(this, "Файл: " + openFileDialog1.FileName);
                             surnameFile = openFileDialog1.FileName;
                             surnameDT = Model.GetDataFromRuleBook(wb);
                             ExcelRuleBookView.DataSource = surnameDT;
@@ -101,7 +105,7 @@ namespace ExcelGrinder
                 {
                     files = Directory.GetFiles(fbd.SelectedPath);
 
-                    ShowInfo("В папке: " + fbd.SelectedPath + " найдено " + files.Length.ToString() + " файлов.");
+                    ShowInfo(this, "В папке: " + fbd.SelectedPath + " найдено " + files.Length.ToString() + " файлов.");
                     selectedPath = fbd.SelectedPath;
                 }
             }
@@ -109,7 +113,7 @@ namespace ExcelGrinder
 
         private async void Grindbtn_ClickAsync(object sender, EventArgs e)
         {
-            InfoLabel.Text = selectedPath;
+            
             if (string.IsNullOrEmpty(selectedPath))
             {
                 MessageBox.Show("Папка с файлами не выбрана");
@@ -127,64 +131,64 @@ namespace ExcelGrinder
             }
 
             Model.ClearDestinationWb();
+
+            List<SurnameObject> surnames = await Task.Run(() => Model.ScanBooks(files));
             
             foreach (DataRow row in surnameDT.Rows)
             {
-                var name = row[2].ToString();
+                var name = row[2].ToString().Trim();
                 if (string.IsNullOrEmpty(name))
                     continue;
 
-                if (name.Contains(value: "Цикловая") || name.Contains(value: "Студклуб"))
+                if (name.Contains(value: "Цикловая") 
+                    || name.Contains(value: "Студклуб")
+                    || name.Contains(value: "Библиотека")
+                    || name.Contains(value: "Бухгалтерия")
+                    || name.Contains(value: "Отдел кадров")
+                    || name.Contains(value: "Профком")
+                    || name.Contains(value: "А Г Р- специалисты"))
                 {
                     continue;
                 }
+
                 bool isFound = false;
+
+                if (CancelAction)
+                {
+                    CancelAction = false;
+                    break;
+                }
 
                 //TESTING STUB!!!
                 /*if (name.Trim() == "Бібікова Оксана Юріївна")
                 {
                     break;
                 } */
-                
-                foreach (var fileName in files)
+
+                // Search in Surnames List
+                var surname = surnames.Where(s => s.Surname == name).FirstOrDefault();
+                if (surname != null)
                 {
-                    if (CancelAction)
-                    {
-                        CancelAction = false;
-                        break;
-                    }
-
-                    if (!Path.GetExtension(fileName).Contains("xls") || fileName == surnameFile)
-                    {
-                        continue;
-                    }
-
-
-                    ShowInfo("Ищу: " + name.Trim() + " в файле: " + fileName.Trim());
-                    using (var fs = File.OpenRead(fileName))
+                    ShowInfo(this, "Копирую: " + name.Trim() + " в файле: " + surname.File.Trim());
+                    isFound = true;
+                    using (var fs = File.OpenRead(surname.File))
                     {
                         XSSFWorkbook workBook = new XSSFWorkbook(fs);
                         ISheet sheet = workBook.GetSheet(workBook.GetSheetName(0));
-                        int rowNumber = SearchNameInFile(sheet, name);
-                        if (rowNumber >= 0)
-                        {
-                            isFound = true;
-
-                            await Task.Run(() => Model.CopyPeople(workBook, sheet, rowNumber));
-                            continue;
-                        }
+                                
+                        await Task.Run(() => Model.CopyPeople(workBook, sheet, surname));
                     }
                 }
+                
+                
                 if (!isFound)
                 {
                     AddNotFound(name);
                 }
             }
 
-            // Create file and write WorkBook          
-
+            // Create file and write WorkBook    
             Model.WriteOutputFile();
-            ExcelOutputView.DataSource = Model.ShowInfoInGrid();
 
             if (NotFoundSurnames.Count > 0)
             {
@@ -192,32 +196,15 @@ namespace ExcelGrinder
             }
         }
 
-        private int SearchNameInFile(ISheet sheet, string name)
-        {
-            for (int i = 0; i < sheet.LastRowNum; i++)
-            {
-                try
-                {
-                    if (sheet.GetRow(i).GetCell(1).CellType == CellType.String)
-                    {
-                        if (sheet.GetRow(i).GetCell(1).StringCellValue.Trim().ToUpper() == name.Trim().ToUpper())
-                        {
-                            return i;
-                        }
-                    }
-                }
-                catch { }
-            }
-            return -1;
-        }
-  
-       
         #endregion
 
         #region Helpers
-        private void ShowInfo(string message)
+        private void ShowInfo(object sender, string message)
         {
-            InfoLabel.Text = message;
+            Invoke(new System.Action(() =>
+            {
+                InfoText.Text = InfoText.Text + "\r\n" + DateTime.Now.ToShortTimeString() + " " + message;
+            }));
         }
 
         private void AddNotFound(string name)
